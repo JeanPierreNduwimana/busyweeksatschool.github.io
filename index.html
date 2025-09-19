@@ -220,7 +220,7 @@
   <footer>Application de gestion de charge de travail par semaine - Session automne 2025</footer>
 
   <script>
-  const STORAGE_KEY = 'charge_app_v4_data';
+  const STORAGE_KEY = 'BusyWeeksAtSchool_data';
 
   let gapiInitialized = false;
   let tokenClient = null;
@@ -229,12 +229,7 @@
 
   function defaultState(){
     return {
-      courses: [
-        {id: 'MAT210', name: 'MAT210', cls:'color-orange'},
-        {id: 'MAT145', name: 'MAT145', cls:'color-blue'},
-        {id: 'LOG121', name: 'LOG121', cls:'color-green'},
-        {id: 'IND105', name: 'IND105', cls:'color-pink'}
-      ],
+      courses: [],
       evaluations: []
     };
   }
@@ -762,22 +757,7 @@
     }
   });
 
-  // ========== Demo Data ==========
-  function ensureDefaults(){
-    if(state.evaluations.length === 0){
-      state.evaluations = [
-        {id:'demo1', course:'MAT210', title:'Mini-test 1', percentage:'10%', date:'2025-09-26'},
-        {id:'demo2', course:'MAT210', title:'Examen Intra', percentage:'35%', date:'2025-10-20'},
-        {id:'demo3', course:'MAT145', title:'Devoir 1', percentage:'15%', date:'2025-09-25'},
-        {id:'demo4', course:'LOG121', title:'Labo 1', percentage:'5%', week:3},
-        {id:'demo5', course:'IND105', title:'Quiz 1', percentage:'5%', date:'2025-09-29'}
-      ];
-      save(state);
-    }
-  }
-
   // ========== Initialize ==========
-  ensureDefaults();
   renderCourses();
   renderBoard();
 

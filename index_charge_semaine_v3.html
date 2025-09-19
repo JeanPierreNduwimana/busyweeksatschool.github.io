@@ -1,0 +1,703 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Charge par semaine — App locale (v3)</title>
+  <style>
+    :root{
+      --col-gap:8px;
+      --col-width:90px;
+      --font: 'Segoe UI', Roboto, Arial, sans-serif;
+      --header-h:64px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0}
+    body{font-family:var(--font);background:#0f172a;color:#e6eef8;display:flex;flex-direction:column;height:100vh}
+    header{display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,0.03);height:var(--header-h)}
+    .left-toggle{margin-right:6px}
+    .left-toggle button{font-size:18px;padding:8px 10px;border-radius:8px;background:transparent;border:1px solid rgba(255,255,255,0.06);color:#cfe2ff;cursor:pointer}
+    header h1{margin:0;font-size:18px}
+    .top-actions{margin-left:auto;display:flex;gap:8px;align-items:center}
+
+    button{background:#233b7a;border:none;color:white;padding:8px 10px;border-radius:8px;cursor:pointer}
+    button.ghost{background:transparent;border:1px solid rgba(255,255,255,0.06)}
+    .badge{background:#ff6b6b;color:white;border-radius:999px;padding:3px 8px;font-size:12px;margin-left:6px}
+
+    main{display:flex;flex:1;min-height:0;overflow:hidden}
+    .sidebar{width:320px;background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01));padding:12px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);overflow:auto;transition:width 0.18s ease,opacity 0.18s}
+    .sidebar.hidden{display:none}
+    .content{flex:1;display:flex;flex-direction:column;min-width:0;gap:8px;padding:10px 12px;min-height:0}
+
+    /* Board takes max available height; header + footer accounted for by layout */
+    .board-wrap{flex:1;min-height:0;display:flex;flex-direction:column}
+    .board-scroll{overflow:auto;flex:1}
+    .board{display:grid;grid-template-columns:repeat(14, var(--col-width));gap:var(--col-gap);align-items:end;padding:12px;height:100%}
+
+    .col{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));border-radius:8px;padding:8px 6px;display:flex;flex-direction:column;justify-content:flex-end;min-height:120px;position:relative;border:1px solid rgba(255,255,255,0.04);transition:transform .18s}
+    .col.selected{box-shadow:0 10px 30px rgba(21,56,150,0.25);transform:translateY(-6px);border-color:rgba(120,160,255,0.22)}
+    .col-header{font-size:12px;text-align:center;margin-bottom:6px}
+    .week-range{font-size:11px;color:#9fb0ff}
+
+    .stack{display:flex;flex-direction:column-reverse;gap:6px;min-height:60px;align-items:stretch}
+
+    /* Blocks scale: font-size and padding adapt with viewport height */
+    .eval{padding:calc(6px + 0.3vh) calc(6px + 0.6vh);font-size:calc(11px + 0.35vh);border-radius:6px;color:#041026;display:flex;flex-direction:column;justify-content:center;box-shadow:0 4px 8px rgba(2,6,23,0.6);cursor:default;overflow:hidden}
+    .eval small{font-size:calc(10px + 0.12vh);color:rgba(0,0,0,0.6)}
+    .eval .line{display:block;line-height:1.05;white-space:nowrap;text-overflow:ellipsis;overflow:hidden}
+
+    /* color swatches (classes) */
+    .color-orange{background:linear-gradient(180deg,#ffd7a6,#ffc28a)}
+    .color-blue{background:linear-gradient(180deg,#cde7ff,#9fc9ff)}
+    .color-green{background:linear-gradient(180deg,#d6ffd8,#aef0b4)}
+    .color-pink{background:linear-gradient(180deg,#ffd0e7,#ff9fcf)}
+    .color-violet{background:linear-gradient(180deg,#e2d4ff,#c9b1ff)}
+    .color-yellow{background:linear-gradient(180deg,#fff1b8,#ffe58a)}
+    .color-custom{background:linear-gradient(180deg,#f0f0f0,#d9d9d9)}
+
+    .approx{opacity:0.75;border:2px dashed rgba(0,0,0,0.08);}
+    .tbd{opacity:0.6;filter:grayscale(20%);}
+
+    .floating-container{background:linear-gradient(180deg,rgba(255,255,255,0.01),rgba(255,255,255,0.008));padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.03);display:flex;flex-direction:column}
+    .floating-list{display:flex;gap:8px;overflow:auto;padding:6px;align-items:center}
+    .floating-list .eval{min-width:150px;flex:0 0 auto}
+
+    label{display:block;font-size:13px;margin-top:8px}
+    input[type="text"], input[type="date"], select, textarea, input[type="number"]{width:100%;padding:8px;border-radius:6px;border:1px solid rgba(255,255,255,0.06);margin-top:6px;background:rgba(255,255,255,0.02);color:inherit;font-size:13px}
+    select{appearance:none; -webkit-appearance:none; -moz-appearance:none; padding-right:34px; color: #cfe2ff; }
+    select option{ color:#041026; background:#f4f7ff; }
+    .form-row{display:flex;gap:8px}
+    .form-row > *{flex:1}
+
+    .list{margin-top:8px}
+    .list .row{display:flex;align-items:center;justify-content:space-between;padding:8px;border-radius:6px;background:rgba(255,255,255,0.01);margin-bottom:6px}
+    .muted{color:#9fb0ff;font-size:12px}
+    .legend{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+
+    .modal{position:fixed;left:0;top:0;width:100%;height:100%;display:none;align-items:center;justify-content:center;background:rgba(2,6,23,0.6);z-index:9999}
+    .modal .card{background:#071020;padding:16px;border-radius:10px;min-width:320px;border:1px solid rgba(255,255,255,0.04)}
+
+    footer{padding:8px 14px;border-top:1px solid rgba(255,255,255,0.03);font-size:13px;color:#bcd0ff}
+
+    @media (max-width:1000px){ .sidebar{display:none} .board{grid-template-columns:repeat(14,80px)} }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="left-toggle">
+      <button id="btnToggleSidebar" aria-label="Basculer la gestion des cours">&lt;</button>
+    </div>
+    <h1>Charge par semaine — App locale (v3)</h1>
+
+    <div class="top-actions">
+      <button id="btnToggleFloating">Évals sans date <span id="floatingBadge" class="badge" style="display:none">0</span></button>
+      <button id="btnAddEval">+ Ajouter évaluation</button>
+      <button id="btnExportLocal" class="ghost">Exporter (local)</button>
+      <button id="btnImportLocal" class="ghost">Importer (local)</button>
+      <button id="btnExportDrive" class="ghost">Exporter → Drive</button>
+      <button id="btnImportDrive" class="ghost">Importer ← Drive</button>
+      <button id="btnReset" class="ghost" title="Réinitialiser données (supprime tout)">Reset</button>
+    </div>
+  </header>
+
+  <main>
+    <aside class="sidebar" id="sidebar" aria-label="Gestion des cours & évaluations">
+      <strong>Gestion des cours</strong>
+      <div style="margin-top:8px">
+        <label>Nom du cours</label>
+        <input id="courseName" type="text" placeholder="Ex: MAT210" />
+        <label>Couleur</label>
+        <select id="courseClass">
+          <option value="color-orange">Orange</option>
+          <option value="color-blue">Bleu</option>
+          <option value="color-green">Vert</option>
+          <option value="color-pink">Rose</option>
+          <option value="color-violet">Violet</option>
+          <option value="color-yellow">Jaune</option>
+          <option value="color-custom">Personnalisé</option>
+        </select>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button id="btnAddCourse">Ajouter</button>
+          <button id="btnClearCourses" class="ghost">Suppr. tout</button>
+        </div>
+      </div>
+
+      <div class="list" id="coursesList" aria-live="polite"></div>
+
+      <hr style="margin:12px 0;border-color:rgba(255,255,255,0.03)" />
+      <strong>Évaluations (rapide)</strong>
+      <div style="margin-top:8px">
+        <label>Nom</label><input id="quickTitle" type="text" placeholder="Mini-test 1" />
+        <label>Cours</label><select id="quickCourse" required></select>
+        <div class="form-row">
+          <div><label>Date (optionnelle)</label><input id="quickDate" type="date" /></div>
+          <div><label>Semaine (optionnelle)</label><input id="quickWeek" type="number" min="1" max="14" /></div>
+        </div>
+        <label>Pourcentage (info)</label><input id="quickPerc" type="text" placeholder="10%" />
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button id="btnQuickAdd">Ajouter éval</button>
+        </div>
+      </div>
+
+      <div style="margin-top:12px" class="muted">Astuce : si date ET semaine sont fournis, la date est prioritaire. Les évaluations sans date/semaines vont dans la section dédiée en dessous du tableau.</div>
+
+      <hr style="margin:12px 0;border-color:rgba(255,255,255,0.03)" />
+      <div class="legend" aria-hidden="true" id="legend"></div>
+    </aside>
+
+    <section class="content">
+      <div class="board-wrap">
+        <div class="board-scroll" id="boardScroll">
+          <div id="board" class="board" aria-live="polite"></div>
+        </div>
+      </div>
+
+      <div id="floatingContainer" class="floating-container" style="display:none">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <strong>Évaluations sans date ni semaine</strong>
+          <span class="small">Cliquez sur un bloc pour l'éditer et lui assigner une date ou une semaine.</span>
+        </div>
+        <div id="floatingList" class="floating-list"></div>
+      </div>
+    </section>
+  </main>
+
+  <div id="modal" class="modal" role="dialog" aria-modal="true">
+    <div class="card">
+      <h3 id="modalTitle">Ajouter / Modifier évaluation</h3>
+      <div style="margin-top:8px">
+        <label>Nom</label><input id="evTitle" type="text" required />
+        <label>Cours</label><select id="evCourse" required></select>
+        <div class="form-row">
+          <div><label>Date</label><input id="evDate" type="date" /></div>
+          <div><label>Semaine (1-14)</label><input id="evWeek" type="number" min="1" max="14" /></div>
+        </div>
+        <label>Pourcentage (info)</label><input id="evPerc" type="text" />
+        <label>Note</label><textarea id="evNote" rows="2"></textarea>
+        <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
+          <label style="display:flex;gap:6px;align-items:center"><input id="evApprox" type="checkbox" /> Date approximative</label>
+          <label style="display:flex;gap:6px;align-items:center"><input id="evTbd" type="checkbox" /> TBD (ex: \"semaine 13 ou 14\")</label>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:12px">
+          <button id="saveEv">Enregistrer</button>
+          <button id="cancelEv" class="ghost">Annuler</button>
+          <button id="deleteEv" class="ghost" style="margin-left:auto;color:#ffb4b4">Supprimer</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Import file input -->
+  <input id="importFile" type="file" accept=".json" style="display:none" />
+
+  <!-- Drive/clipboard modal -->
+  <div id="driveModal" class="modal"><div class="card" style="max-width:520px"><h3>Importer/Exporter vers Google Drive</h3>
+    <p class="muted">Import/Export direct vers Google Drive nécessite une configuration OAuth & API côté Google (clé client). Comme cette page est autonome, je propose une méthode simple :</p>
+    <ul>
+      <li>Clique <strong>Copier JSON</strong> pour copier les données actuelles (ou coller un JSON importé ci-dessous).</li>
+      <li>Ouvre <em>drive.google.com</em>, crée un nouveau fichier texte, colle le JSON, puis enregistre le fichier sur ton Drive.</li>
+      <li>Pour importer depuis Drive : ouvre le fichier JSON dans Drive, copie son contenu, puis colle-le dans la zone d'import ci-dessous et clique <strong>Importer</strong>.</li>
+    </ul>
+    <textarea id="driveText" rows="8" style="width:100%;margin-top:8px;background:#081426;color:#cfe2ff;border-radius:6px;padding:8px"></textarea>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button id="copyJSON">Copier JSON</button>
+      <button id="pasteAndImport">Importer</button>
+      <button id="closeDrive" class="ghost" style="margin-left:auto">Fermer</button>
+    </div>
+  </div></div>
+
+  <footer>Note : l'export/import local en JSON remplace les données locales lors de l'import. Utilise l'option Drive pour transférer manuellement le JSON vers/depuis Google Drive.</footer>
+
+  <script>
+  // ========== Data & persistence ==========
+  const STORAGE_KEY = 'charge_app_v3_data';
+  function defaultState(){
+    return {
+      courses: [
+        {id: 'MAT210', name: 'MAT210', cls:'color-orange'},
+        {id: 'MAT145', name: 'MAT145', cls:'color-blue'},
+        {id: 'LOG121', name: 'LOG121', cls:'color-green'},
+        {id: 'IND105', name: 'IND105', cls:'color-pink'}
+      ],
+      evaluations: [] // will be filled with demo if empty
+    };
+  }
+  function load(){
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY);
+      return raw ? JSON.parse(raw) : defaultState();
+    }catch(e){ console.error('load err', e); return defaultState(); }
+  }
+  function save(state){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+  let state = load();
+
+  // weeks based on session start (1 sept 2025)
+  const sessionStart = new Date(2025,8,1);
+  const weeks = Array.from({length:14}, (_,i)=>{
+    const mon = new Date(sessionStart.getFullYear(), sessionStart.getMonth(), sessionStart.getDate() + i*7);
+    const fri = new Date(mon.getFullYear(), mon.getMonth(), mon.getDate() + 4);
+    return {index: i+1, mon, fri};
+  });
+
+  // UI refs
+  const board = document.getElementById('board');
+  const boardScroll = document.getElementById('boardScroll');
+  const sidebar = document.getElementById('sidebar');
+  const btnToggleSidebar = document.getElementById('btnToggleSidebar');
+  const btnToggleFloating = document.getElementById('btnToggleFloating');
+  const floatingContainer = document.getElementById('floatingContainer');
+  const floatingList = document.getElementById('floatingList');
+  const floatingBadge = document.getElementById('floatingBadge');
+  const importFile = document.getElementById('importFile');
+  const driveModal = document.getElementById('driveModal');
+  const driveText = document.getElementById('driveText');
+
+  // helpers
+  function uid(prefix='id'){ return prefix + '-' + Math.random().toString(36).slice(2,9); }
+  function clearChildren(el){ while(el.firstChild) el.removeChild(el.firstChild); }
+  function findWeekForDate(dstr){
+    if(!dstr) return null;
+    const d = new Date(dstr);
+    for(const w of weeks){
+      const mon = new Date(w.mon.getFullYear(), w.mon.getMonth(), w.mon.getDate());
+      const fri = new Date(w.fri.getFullYear(), w.fri.getMonth(), w.fri.getDate());
+      if(d.getTime() >= mon.getTime() && d.getTime() <= fri.getTime()) return w.index;
+    }
+    return null;
+  }
+  function formatDateWithWeekday(dstr){
+    if(!dstr) return '';
+    const d = new Date(dstr);
+    // French weekday & short date like "Lundi 22 sept"
+    return d.toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'short' });
+  }
+
+  // ====== render courses & legend & quick selects ======
+  const coursesList = document.getElementById('coursesList');
+  const evCourseSel = document.getElementById('evCourse');
+  const quickCourse = document.getElementById('quickCourse');
+  const legend = document.getElementById('legend');
+
+  function renderCourses(){
+    clearChildren(coursesList);
+    clearChildren(evCourseSel);
+    clearChildren(quickCourse);
+    state.courses.forEach(c=>{
+      const row = document.createElement('div'); row.className='row';
+      const left = document.createElement('div'); left.style.display='flex'; left.style.alignItems='center';
+      const colorBox = document.createElement('div'); colorBox.className='color-box ' + (c.cls || 'color-custom'); colorBox.style.width='18px'; colorBox.style.height='18px'; colorBox.style.marginRight='8px';
+      left.appendChild(colorBox);
+      const txt = document.createElement('div'); txt.innerHTML = `<strong>${c.name}</strong><div class="small">${c.cls.replace('color-','')}</div>`;
+      left.appendChild(txt);
+      row.appendChild(left);
+      const actions = document.createElement('div');
+      const btnE = document.createElement('button'); btnE.textContent='Édit'; btnE.className='ghost'; btnE.addEventListener('click',()=> editCourse(c.id));
+      const btnD = document.createElement('button'); btnD.textContent='Suppr'; btnD.className='ghost'; btnD.addEventListener('click',()=> deleteCourse(c.id));
+      actions.appendChild(btnE); actions.appendChild(btnD);
+      row.appendChild(actions);
+      coursesList.appendChild(row);
+
+      const opt = document.createElement('option'); opt.value = c.id; opt.textContent = c.name; evCourseSel.appendChild(opt);
+      const opt2 = opt.cloneNode(true); quickCourse.appendChild(opt2);
+    });
+
+    // legend
+    clearChildren(legend);
+    state.courses.forEach(c=>{
+      const it = document.createElement('div'); it.className='item'; it.style.display='flex'; it.style.gap='8px'; it.style.alignItems='center';
+      const box = document.createElement('div'); box.className='color-box '+(c.cls||'color-custom'); box.style.width='18px'; box.style.height='18px';
+      const lab = document.createElement('div'); lab.textContent = c.name;
+      it.appendChild(box); it.appendChild(lab);
+      legend.appendChild(it);
+    });
+  }
+
+  function editCourse(id){
+    const c = state.courses.find(x=>x.id===id); if(!c) return;
+    const newName = prompt('Nom du cours', c.name); if(!newName) return;
+    c.name = newName; save(state); renderCourses(); renderBoard();
+  }
+  function deleteCourse(id){
+    if(!confirm('Supprimer ce cours et toutes ses évaluations ?')) return;
+    state.courses = state.courses.filter(c=>c.id!==id);
+    state.evaluations = state.evaluations.filter(e=>e.course !== id);
+    save(state); renderCourses(); renderBoard();
+  }
+
+  // Add course button
+  document.getElementById('btnAddCourse').addEventListener('click', ()=>{
+    const name = document.getElementById('courseName').value.trim();
+    const cls = document.getElementById('courseClass').value || 'color-custom';
+    if(!name) return alert('Donne un nom de cours');
+    const id = name.replace(/\s+/g,'').toUpperCase();
+    if(state.courses.find(c=>c.id===id)){ alert('Cours existe déjà'); return; }
+    state.courses.push({id, name, cls});
+    save(state); renderCourses(); document.getElementById('courseName').value='';
+  });
+  document.getElementById('btnClearCourses').addEventListener('click', ()=>{
+    if(!confirm('Supprimer tous les cours et évaluations ?')) return;
+    state = defaultState(); save(state); renderCourses(); renderBoard();
+  });
+
+  // ====== Render Board & Floating list (no-date items) ======
+  function renderBoard(){
+    clearChildren(board);
+    clearChildren(floatingList);
+    const map = {}; for(const w of weeks) map[w.index]=[];
+    const floating = [];
+    state.evaluations.forEach(ev=>{
+      if((!ev.date && !ev.week) && !ev.tbd){
+        floating.push(ev);
+        return;
+      }
+      if(ev.tbd && Array.isArray(ev.weeks)){
+        ev.weeks.forEach(ww=> map[ww] && map[ww].push({...ev, _meta:'tbd'}));
+      } else if(ev.date){
+        const wk = findWeekForDate(ev.date);
+        if(wk) map[wk].push(ev);
+        else map[14].push({...ev, approx:true});
+      } else if(ev.week){
+        map[ev.week] ? map[ev.week].push(ev) : map[14].push({...ev, approx:true});
+      } else {
+        floating.push(ev);
+      }
+    });
+
+    weeks.forEach(w=>{
+      const col = document.createElement('div'); col.className='col'; col.dataset.week = w.index;
+      const header = document.createElement('div'); header.className='col-header';
+      const mon = w.mon.toLocaleDateString('fr-CA',{day:'2-digit',month:'short'});
+      const fri = w.fri.toLocaleDateString('fr-CA',{day:'2-digit',month:'short'});
+      header.innerHTML = `<div style="font-weight:600">Semaine ${w.index}</div><div class='week-range'>${mon} → ${fri}</div>`;
+      col.appendChild(header);
+
+      const stack = document.createElement('div'); stack.className='stack';
+      const items = map[w.index] || [];
+      items.forEach(item=>{
+        const courseObj = state.courses.find(c=>c.id === item.course);
+        const cls = courseObj ? courseObj.cls : 'color-custom';
+        const ev = document.createElement('div');
+        ev.className = `eval ${cls}` + (item.approx||item._meta==='tbd' ? ' approx' : '') + (item._meta==='tbd' ? ' tbd' : '');
+        ev.dataset.id = item.id;
+        // stacked lines: title / course+perc / date-with-weekday (if present) / note
+        const dateLine = item.date ? formatDateWithWeekday(item.date) : (item.week ? 'Semaine ' + item.week : '');
+        ev.innerHTML = `<span class="line"><strong>${escapeHtml(item.title || '')}</strong></span>
+                        <span class="line small">${escapeHtml(item.course || '')} ${item.percentage ? ' • ' + escapeHtml(item.percentage) : ''}</span>
+                        <span class="line small">${escapeHtml(dateLine)}</span>
+                        <span class="line small" title="${escapeHtml(item.note || '')}">${escapeHtml(item.note || '')}</span>`;
+        ev.addEventListener('dblclick', ()=> openEditModal(item.id));
+        stack.appendChild(ev);
+      });
+
+      col.appendChild(stack);
+      board.appendChild(col);
+    });
+
+    // floating list
+    floating.forEach(item=>{
+      const courseObj = state.courses.find(c=>c.id === item.course);
+      const cls = courseObj ? courseObj.cls : 'color-custom';
+      const ev = document.createElement('div');
+      ev.className = `eval ${cls}` + (item.approx ? ' approx' : '');
+      ev.dataset.id = item.id;
+      ev.innerHTML = `<span class="line"><strong>${escapeHtml(item.title || '')}</strong></span>
+                      <span class="line small">${escapeHtml(item.course || '')} ${item.percentage ? ' • ' + escapeHtml(item.percentage) : ''}</span>
+                      <span class="line small">${escapeHtml(item.note || '')}</span>`;
+      ev.addEventListener('dblclick', ()=> openEditModal(item.id));
+      floatingList.appendChild(ev);
+    });
+
+    // floating badge & visibility
+    const countFloating = floating.length;
+    if(countFloating > 0){
+      floatingBadge.style.display = 'inline-block';
+      floatingBadge.textContent = String(countFloating);
+      if(floatingContainer.dataset.visible === 'true') floatingContainer.style.display = 'flex';
+      else floatingContainer.style.display = 'none';
+    } else {
+      floatingBadge.style.display = 'none';
+      floatingContainer.style.display = 'none';
+    }
+
+    // select current week column
+    selectCurrentWeekColumn();
+  }
+
+  // select and scroll to current week
+  function selectCurrentWeekColumn(){
+    const now = new Date();
+    // determine week index by mapping now to session weeks
+    let currentWeek = null;
+    for(const w of weeks){
+      const mon = new Date(w.mon.getFullYear(), w.mon.getMonth(), w.mon.getDate());
+      const fri = new Date(w.fri.getFullYear(), w.fri.getMonth(), w.fri.getDate());
+      if(now.getTime() >= mon.getTime() && now.getTime() <= fri.getTime()){
+        currentWeek = w.index;
+        break;
+      }
+    }
+    // if not in session range and today's before start or after end, don't select any
+    clearSelectedColumns();
+    if(currentWeek){
+      const col = board.querySelector('.col[data-week="'+currentWeek+'"]');
+      if(col){
+        col.classList.add('selected');
+        // scroll the board container so selected column is centered (smooth)
+        const wrap = document.getElementById('boardScroll');
+        const rect = col.getBoundingClientRect();
+        const wrapRect = wrap.getBoundingClientRect();
+        const offset = rect.left - wrapRect.left - (wrapRect.width/2 - rect.width/2);
+        wrap.scrollBy({ left: offset, behavior: 'smooth' });
+      }
+    }
+  }
+  function clearSelectedColumns(){ board.querySelectorAll('.col.selected').forEach(c=>c.classList.remove('selected')); }
+
+  // escape html
+  function escapeHtml(s){ if(!s) return ''; return String(s).replace(/[&<>"']/g, function(m){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[m]); }); }
+
+  // ====== Quick add & modal add/edit ======
+  document.getElementById('btnQuickAdd').addEventListener('click', ()=>{
+    const title = document.getElementById('quickTitle').value.trim(); if(!title) return alert('Titre requis');
+    const course = quickCourse.value || null; if(!course) return alert('Choisis un cours');
+    const date = document.getElementById('quickDate').value || null;
+    const week = document.getElementById('quickWeek').value ? parseInt(document.getElementById('quickWeek').value,10) : null;
+    if(week !== null && (isNaN(week) || week < 1 || week > 14)) return alert('Semaine doit être entre 1 et 14');
+    const perc = document.getElementById('quickPerc').value.trim() || '';
+    const ev = { id: uid('ev'), title, course, date: date || null, week: week || null, percentage: perc, note:'', tbd:false, approx:false };
+    state.evaluations.push(ev); save(state); renderBoard();
+    document.getElementById('quickTitle').value=''; document.getElementById('quickDate').value=''; document.getElementById('quickWeek').value=''; document.getElementById('quickPerc').value='';
+  });
+
+  // modal logic
+  const modal = document.getElementById('modal');
+  let editId = null;
+  document.getElementById('btnAddEval').addEventListener('click', openAddModal);
+
+  function openAddModal(){
+    editId = null;
+    document.getElementById('modalTitle').textContent = 'Ajouter évaluation';
+    document.getElementById('evTitle').value=''; document.getElementById('evDate').value=''; document.getElementById('evWeek').value=''; document.getElementById('evPerc').value='';
+    document.getElementById('evNote').value=''; document.getElementById('evApprox').checked=false; document.getElementById('evTbd').checked=false;
+    populateCourseSelects();
+    document.getElementById('deleteEv').style.display='none';
+    modal.style.display='flex';
+  }
+  function populateCourseSelects(){
+    clearChildren(evCourseSel);
+    state.courses.forEach(c=>{ const opt = document.createElement('option'); opt.value = c.id; opt.textContent = c.name; evCourseSel.appendChild(opt); });
+  }
+  function openEditModal(id){
+    const ev = state.evaluations.find(x=>x.id===id); if(!ev) return;
+    editId = id; document.getElementById('modalTitle').textContent = 'Modifier évaluation';
+    populateCourseSelects();
+    document.getElementById('evTitle').value = ev.title || '';
+    document.getElementById('evCourse').value = ev.course || (state.courses[0] && state.courses[0].id) || '';
+    document.getElementById('evDate').value = ev.date ? new Date(ev.date).toISOString().slice(0,10) : '';
+    document.getElementById('evWeek').value = ev.week || '';
+    document.getElementById('evPerc').value = ev.percentage || '';
+    document.getElementById('evNote').value = ev.note || '';
+    document.getElementById('evApprox').checked = !!ev.approx;
+    document.getElementById('evTbd').checked = !!ev.tbd;
+    document.getElementById('deleteEv').style.display='inline-block';
+    modal.style.display='flex';
+  }
+  document.getElementById('cancelEv').addEventListener('click', ()=> modal.style.display='none');
+  document.getElementById('saveEv').addEventListener('click', ()=>{
+    const title = document.getElementById('evTitle').value.trim(); if(!title) return alert('Titre requis');
+    const course = document.getElementById('evCourse').value || null;
+    const date = document.getElementById('evDate').value || null;
+    const weekVal = document.getElementById('evWeek').value;
+    const week = weekVal ? parseInt(weekVal,10) : null;
+    if(week !== null && (isNaN(week) || week < 1 || week > 14)) return alert('Semaine doit être entre 1 et 14');
+    const perc = document.getElementById('evPerc').value.trim() || '';
+    const note = document.getElementById('evNote').value.trim() || '';
+    const approx = document.getElementById('evApprox').checked;
+    const tbd = document.getElementById('evTbd').checked;
+    if(editId){
+      const ev = state.evaluations.find(x=>x.id===editId); if(!ev) return alert('Évaluation introuvable');
+      ev.title=title; ev.course=course; ev.date = date || null; ev.week = week || null; ev.percentage=perc; ev.note=note; ev.approx=approx; ev.tbd=tbd;
+      if(tbd && (!ev.weeks || ev.weeks.length===0)){ const w13 = confirm('Placer en semaine 13 ? (OK = oui)'); const w14 = confirm('Placer en semaine 14 ? (OK = oui)'); ev.weeks = []; if(w13) ev.weeks.push(13); if(w14) ev.weeks.push(14); }
+    } else {
+      const newEv = { id: uid('ev'), title, course, date: date || null, week: week || null, percentage: perc, note, approx, tbd };
+      if(tbd){ const w13 = confirm('Placer en semaine 13 ? (OK = oui)'); const w14 = confirm('Placer en semaine 14 ? (OK = oui)'); newEv.weeks = []; if(w13) newEv.weeks.push(13); if(w14) newEv.weeks.push(14); }
+      state.evaluations.push(newEv);
+    }
+    save(state); renderBoard(); modal.style.display='none';
+  });
+  document.getElementById('deleteEv').addEventListener('click', ()=>{
+    if(!editId) return;
+    if(!confirm('Supprimer cette évaluation ?')) return;
+    state.evaluations = state.evaluations.filter(x=>x.id!==editId);
+    save(state); renderBoard(); modal.style.display='none';
+  });
+
+  // dblclick editing on blocks
+  document.addEventListener('dblclick', (e)=>{
+    const el = e.target.closest('.eval');
+    if(el) openEditModal(el.dataset.id);
+  });
+
+  // ====== Sidebar toggle button behavior (leftmost) ======
+  const leftToggleBtn = document.getElementById('btnToggleSidebar');
+  function updateLeftToggleIcon(){
+    if(sidebar.classList.contains('hidden')) leftToggleBtn.textContent = '☰'; else leftToggleBtn.textContent = '<';
+  }
+  leftToggleBtn.addEventListener('click', ()=>{
+    sidebar.classList.toggle('hidden');
+    updateLeftToggleIcon();
+  });
+
+  // ====== Floating toggle & badge ======
+  btnToggleFloating.addEventListener('click', ()=>{
+    const vis = floatingContainer.dataset.visible === 'true';
+    floatingContainer.dataset.visible = vis ? 'false' : 'true';
+    renderBoard();
+  });
+
+  // ====== Export / Import local ==========
+  function exportToFile(filename = 'charge_export.json'){
+    try{
+      const dataStr = JSON.stringify(state, null, 2);
+      const blob = new Blob([dataStr], {type:'application/json'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = filename; a.click();
+      URL.revokeObjectURL(url);
+    }catch(e){ alert('Erreur export: ' + e.message); }
+  }
+  document.getElementById('btnExportLocal').addEventListener('click', ()=> exportToFile());
+
+  importFile.addEventListener('change', (ev)=>{
+    const f = ev.target.files[0]; if(!f) return;
+    const reader = new FileReader();
+    reader.onload = ()=> {
+      try{
+        const imported = JSON.parse(reader.result);
+        // validation: must contain courses (array) and evaluations (array)
+        if(!imported || !Array.isArray(imported.courses) || !Array.isArray(imported.evaluations)){
+          throw new Error('Format invalide : JSON doit contenir "courses" (array) et "evaluations" (array).');
+        }
+        if(!confirm('Importer remplacera les données locales actuelles. Continuer ?')) return;
+        state = imported;
+        save(state);
+        renderCourses(); renderBoard();
+        alert('Importation réussie.');
+      }catch(err){
+        alert('Erreur import: ' + err.message);
+      }
+    };
+    reader.readAsText(f);
+    // reset input
+    importFile.value = '';
+  });
+  document.getElementById('btnImportLocal').addEventListener('click', ()=> importFile.click());
+
+  // ====== Google Drive alternative (copy/paste) ======
+  document.getElementById('btnExportDrive').addEventListener('click', ()=>{
+    driveText.value = JSON.stringify(state, null, 2);
+    driveModal.style.display = 'flex';
+  });
+  document.getElementById('btnImportDrive').addEventListener('click', ()=>{
+    driveText.value = '';
+    driveModal.style.display = 'flex';
+  });
+  document.getElementById('copyJSON').addEventListener('click', async ()=>{
+    try{
+      await navigator.clipboard.writeText(JSON.stringify(state, null, 2));
+      alert('JSON copié dans le presse-papiers. Colle-le dans un fichier sur ton Drive.');
+    }catch(e){
+      alert('Impossible de copier automatiquement : copie manuelle ci-dessous disponible.');
+    }
+  });
+  document.getElementById('pasteAndImport').addEventListener('click', ()=>{
+    const text = driveText.value.trim();
+    if(!text) return alert('Colle d\'abord le JSON exporté depuis Drive dans la zone ci-dessous.');
+    try{
+      const imported = JSON.parse(text);
+      if(!Array.isArray(imported.courses) || !Array.isArray(imported.evaluations)) throw new Error('Format invalide : doit contenir "courses" et "evaluations".');
+      if(!confirm('Importer remplacera les données locales actuelles. Continuer ?')) return;
+      state = imported; save(state); renderCourses(); renderBoard();
+      driveModal.style.display = 'none';
+      alert('Importation réussie depuis Drive (zone texte).');
+    }catch(err){
+      alert('Erreur en important depuis le texte : ' + err.message);
+    }
+  });
+  document.getElementById('closeDrive').addEventListener('click', ()=> driveModal.style.display = 'none');
+
+  // ====== Reset ======
+  document.getElementById('btnReset').addEventListener('click', ()=>{
+    if(!confirm('Réinitialiser les données locales ?')) return;
+    localStorage.removeItem(STORAGE_KEY);
+    state = defaultState();
+    save(state); renderCourses(); renderBoard();
+  });
+
+  // ====== Initial demo data if empty ======
+  function ensureDefaults(){
+    if(!state.evaluations || state.evaluations.length===0){
+      state.evaluations = [
+        ...Array.from({length:10}, (_,i)=>({ id: 'mat210-ex'+(i+1), course:'MAT210', title:'Exercices '+(i+1)+'/10', percentage:'1%', week:3+i, note:'Remise hebdo (lundi)'})),
+        {id:'mat210-mt1', course:'MAT210', title:'Mini-test 1', percentage:'10%', date:'2025-09-26'},
+        {id:'mat210-intra', course:'MAT210', title:'Examen Intra', percentage:'35%', date:'2025-10-20'},
+        {id:'mat210-mt2', course:'MAT210', title:'Mini-test 2', percentage:'', week:10, note:'date non fournie'},
+        {id:'mat210-final', course:'MAT210', title:'Examen Final', percentage:'35%', tbd:true, weeks:[13,14]},
+        {id:'mat145-mt1', course:'MAT145', title:'Mini-test 1', percentage:'7.5%', date:'2025-09-25'},
+        {id:'mat145-devoir1-a', course:'MAT145', title:'Devoir 1', percentage:'7.5%', date:'2025-09-25'},
+        {id:'mat145-devoir1-b', course:'MAT145', title:'Devoir 1 (tard)', percentage:'7.5%', date:'2025-10-09'},
+        {id:'mat145-intra', course:'MAT145', title:'Examen Intra', percentage:'', date:'2025-10-21'},
+        {id:'mat145-mt2', course:'MAT145', title:'Mini-test 2', percentage:'7.5%', date:'2025-11-18'},
+        {id:'mat145-final', course:'MAT145', title:'Examen Final', percentage:'', tbd:true, weeks:[13,14]},
+        {id:'log121-labo1', course:'LOG121', title:'Labo 1', percentage:'4%', week:3, note:'déjà déroulé'},
+        {id:'log121-labo2', course:'LOG121', title:'Labo 2', percentage:'4%', week:4, note:'septembre (date exacte inconnue)', approx:true},
+        {id:'log121-labo3', course:'LOG121', title:'Labo 3', percentage:'6%', week:6, note:'octobre (lundi)'},
+        {id:'log121-labo4', course:'LOG121', title:'Labo 4', percentage:'6%', week:7, note:'octobre (lundi)'},
+        {id:'log121-labo5', course:'LOG121', title:'Labo 5', percentage:'10%', week:11, note:'novembre (date approximative)'},
+        {id:'log121-quiz', course:'LOG121', title:'Quiz', percentage:'?', week:4, note:'date inconnue'},
+        {id:'log121-intra', course:'LOG121', title:'Examen Intra', percentage:'20%', date:'2025-10-07'},
+        {id:'log121-final', course:'LOG121', title:'Examen Final', percentage:'', tbd:true, weeks:[13,14]},
+        {id:'ind105-quiz1', course:'IND105', title:'Quiz (29 sept)', percentage:'', date:'2025-09-29'},
+        {id:'ind105-intra', course:'IND105', title:'Examen Intra', percentage:'35%', date:'2025-10-27'},
+        {id:'ind105-quiz2', course:'IND105', title:'Quiz (3 nov)', percentage:'', date:'2025-11-03'},
+        {id:'ind105-quiz3', course:'IND105', title:'Quiz (23 nov)', percentage:'', date:'2025-11-23'},
+        {id:'ind105-final', course:'IND105', title:'Examen Final', percentage:'35%', tbd:true, weeks:[13,14]},
+      ];
+      save(state);
+    }
+  }
+
+  // ====== small utilities: escape etc done, now init bootstrap ======
+  ensureDefaults();
+  renderCourses();
+  renderBoard();
+  updateLeftToggleIcon();
+
+  // accessibility: close modals on ESC
+  window.addEventListener('keydown', (e)=>{ if(e.key === 'Escape'){ modal.style.display='none'; driveModal.style.display='none'; } });
+
+  // helper: update selection when date/time changes (e.g., new day)
+  // recompute selected week every time window focused/resized
+  window.addEventListener('focus', ()=> selectCurrentWeekColumn());
+  window.addEventListener('resize', ()=> selectCurrentWeekColumn());
+
+  // ====== Helper: import JSON string programmatically (used by Drive text import) ======
+  function importFromJSONString(jsonText){
+    try{
+      const imported = JSON.parse(jsonText);
+      if(!imported || !Array.isArray(imported.courses) || !Array.isArray(imported.evaluations)){
+        throw new Error('Format invalide : JSON doit contenir "courses" (array) et "evaluations" (array).');
+      }
+      if(!confirm('Importer remplacera les données locales actuelles. Continuer ?')) return;
+      state = imported; save(state); renderCourses(); renderBoard();
+      alert('Importation réussie.');
+    }catch(err){
+      alert('Erreur import: ' + (err && err.message ? err.message : String(err)));
+    }
+  }
+
+  // Expose small helper for debugging (optional)
+  window.__charge_v3 = { state, save, load, importFromJSONString };
+
+  </script>
+</body>
+</html>
